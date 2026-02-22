@@ -59,3 +59,19 @@ resilience4j:
       tax:
         maxConcurrentCalls: 50
         maxWaitDuration: 0
+
+
+app:
+  outbox:
+    enabled: true
+    poll:
+      fixed-delay: 1000
+      batch-size: 50
+    retry:
+      max-attempts: 10
+      base-backoff-ms: 500
+
+  messaging:
+    servicebus:
+      connection-string: ${AZURE_SERVICEBUS_CONNECTION_STRING}
+      topic: ${AZURE_SERVICEBUS_TOPIC:quotes}

@@ -4,6 +4,8 @@ import cl.sura.suratech.dto.QuoteCreateRequest;
 import cl.sura.suratech.dto.QuoteResponse;
 import cl.sura.suratech.entity.QuoteEntity;
 import cl.sura.suratech.entity.QuoteItemEntity;
+import cl.sura.suratech.integration.events.QuoteIssuedEvent;
+import cl.sura.suratech.integration.outbox.QuoteIssuedOutboxService;
 import cl.sura.suratech.mapper.QuoteMapper;
 import cl.sura.suratech.repository.QuoteRepository;
 import cl.sura.suratech.service.AggregationService;
@@ -19,13 +21,16 @@ public class QuoteApplicationServiceImpl implements QuoteApplicationService {
 
     private final AggregationService aggregationService;
     private final QuoteRepository quoteRepository;
+    private final QuoteIssuedOutboxService quoteIssuedOutboxService;
     private final QuoteMapper mapper;
 
     public QuoteApplicationServiceImpl(AggregationService aggregationService,
-                                          QuoteRepository quoteRepository,
-                                          QuoteMapper mapper) {
+                                       QuoteRepository quoteRepository,
+                                       QuoteIssuedOutboxService quoteIssuedOutboxService,
+                                       QuoteMapper mapper) {
         this.aggregationService = aggregationService;
         this.quoteRepository = quoteRepository;
+        this.quoteIssuedOutboxService = quoteIssuedOutboxService;
         this.mapper = mapper;
     }
 
@@ -65,6 +70,31 @@ public class QuoteApplicationServiceImpl implements QuoteApplicationService {
             entity.getItems().add(item);
         }
 
-        return mapper.toResponse(quoteRepository.save(entity));
+        QuoteEntity saved = quoteRepository.save(entity);
+
+        var event = new QuoteIssuedEvent(
+                saved.getId().toString(),
+                now,
+                new QuoteIssuedEvent.Customer(saved.getCustomerId()),
+                saved.getCurrency(),
+                new QuoteIssuedEvent.Totals(saved.getSubtotal(), saved.getTaxTotal(), saved.getGrandTotal()),
+                agg.items().stream()
+                        .map(it -> new QuoteIssuedEvent.Item(
+                                it.sku(),
+                                it.name(),
+                                it.quantity(),
+                                it.unitPrice(),
+                                it.taxRate(),
+                                it.lineTotal(),
+                                it.taxAmount()
+                        ))
+                        .toList(),
+                null,
+                1
+        );
+
+        quoteIssuedOutboxService.enqueueQuoteIssued(event);
+
+        return mapper.toResponse(saved);
     }
 }

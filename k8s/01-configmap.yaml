@@ -7,3 +7,4 @@ data:
   IDEMPOTENCY_TTL_SECONDS: "86400"
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,metrics,prometheus"
   SPRING_DATASOURCE_URL: "jdbc:mysql://mysql.default.svc.cluster.local:3306/suratech?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+  AZURE_SERVICEBUS_TOPIC: "quotes"
