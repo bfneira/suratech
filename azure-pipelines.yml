@@ -10,7 +10,7 @@ pr:
       - "*"
 
 variables:
-  vmImage: "ubuntu-latest"
+  agentPool: "self-hosted"
   javaVersion: "21"
   mavenCache: "$(Pipeline.Workspace)/.m2/repository"
   imageName: "suratech"
@@ -18,14 +18,23 @@ variables:
   fullImageName: "$(imageName):$(imageTag)"
 
 stages:
-  - stage: Build
-    displayName: "Build (Maven)"
+  - stage: BuildAndTest
+    displayName: "Build + Test (Maven)"
     jobs:
-      - job: MavenBuild
-        displayName: "Compile + Package"
+      - job: Maven
+        displayName: "Compile + Unit Tests + Package"
         pool:
-          vmImage: "$(vmImage)"
+          name: "$(agentPool)"
         steps:
+          - script: |
+              echo "Agent: $(Agent.Name)"
+              echo "OS: $(Agent.OS)"
+              java -version || true
+              mvn -version || true
+              docker --version || true
+              docker compose version || true
+            displayName: "Print tool versions (debug)"
+
           - task: Cache@2
             displayName: "Cache Maven local repo"
             inputs:
@@ -42,52 +51,16 @@ stages:
               jdkSourceOption: "PreInstalled"
 
           - task: Maven@4
-            displayName: "Maven package (skip tests)"
+            displayName: "Maven clean test package"
             inputs:
               mavenPomFile: "pom.xml"
-              goals: "clean package"
-              options: "-DskipTests -Dmaven.repo.local=$(mavenCache)"
-              publishJUnitResults: false
-
-          - publish: "$(System.DefaultWorkingDirectory)/target"
-            displayName: "Publish JAR artifact (target/)"
-            artifact: "target"
-
-  - stage: Test
-    displayName: "Test (Unit)"
-    dependsOn: Build
-    jobs:
-      - job: UnitTests
-        displayName: "Run unit tests"
-        pool:
-          vmImage: "$(vmImage)"
-        steps:
-          - task: Cache@2
-            displayName: "Cache Maven local repo"
-            inputs:
-              key: 'maven | "$(Agent.OS)" | **/pom.xml'
-              restoreKeys: |
-                maven | "$(Agent.OS)"
-              path: "$(mavenCache)"
-
-          - task: JavaToolInstaller@0
-            displayName: "Use Java $(javaVersion)"
-            inputs:
-              versionSpec: "$(javaVersion)"
-              jdkArchitectureOption: "x64"
-              jdkSourceOption: "PreInstalled"
-
-          - task: Maven@4
-            displayName: "Maven test"
-            inputs:
-              mavenPomFile: "pom.xml"
-              goals: "test"
+              goals: "clean test package"
               options: "-Dmaven.repo.local=$(mavenCache)"
               publishJUnitResults: true
               testResultsFiles: "**/surefire-reports/TEST-*.xml"
 
           - task: PublishCodeCoverageResults@2
-            displayName: "Publish code coverage (si aplica)"
+            displayName: "Publish code coverage"
             condition: succeededOrFailed()
             inputs:
               codeCoverageTool: "JaCoCo"
@@ -95,14 +68,18 @@ stages:
               reportDirectory: "$(System.DefaultWorkingDirectory)/**/target/site/jacoco"
               failIfCoverageEmpty: false
 
+          - publish: "$(System.DefaultWorkingDirectory)/target"
+            displayName: "Publish JAR artifact (target/)"
+            artifact: "target"
+
   - stage: Container
     displayName: "Build Container (Docker)"
-    dependsOn: Test
+    dependsOn: BuildAndTest
     jobs:
       - job: DockerBuild
         displayName: "Docker build"
         pool:
-          vmImage: "$(vmImage)"
+          name: "$(agentPool)"
         steps:
           - task: Docker@2
             displayName: "Docker build"
@@ -122,6 +99,7 @@ stages:
           - script: |
               docker save "$(fullImageName)" -o suratech-image.tar
             displayName: "docker save image"
+
           - publish: "suratech-image.tar"
             displayName: "Publish image tar artifact"
             artifact: "docker-image"
@@ -133,7 +111,7 @@ stages:
       - job: IT
         displayName: "Bring up stack + smoke test"
         pool:
-          vmImage: "$(vmImage)"
+          name: "$(agentPool)"
         steps:
           - download: current
             artifact: "docker-image"
@@ -154,21 +132,30 @@ stages:
 
           - script: |
               set -e
+
               echo "Waiting for readiness..."
+              ready=0
               for i in {1..60}; do
-                if curl -fsS "http://localhost:8080/actuator/health/readiness" | grep -q '"status"'; then
+                if curl -fsS "http://localhost:8080/actuator/health/readiness" | grep -q '"status":"UP"'; then
                   echo "Ready"
+                  ready=1
                   break
                 fi
                 sleep 2
               done
 
-              echo "Calling liveness..."
-              curl -fsS "http://localhost:8080/actuator/health/liveness"
+              if [ $ready -ne 1 ]; then
+                echo "ERROR: App never became ready"
+                docker compose ps || true
+                docker compose logs --no-color || true
+                exit 1
+              fi
 
-              echo "Calling root or a known endpoint..."
-              # Ajusta el endpoint según tu API real
-              curl -fsS "http://localhost:8080/actuator/health"
+              echo "Calling liveness..."
+              curl -fsS "http://localhost:8080/actuator/health/liveness" | grep -q '"status":"UP"'
+
+              echo "Calling health..."
+              curl -fsS "http://localhost:8080/actuator/health" | grep -q '"status":"UP"'
             displayName: "Integration smoke tests"
 
           - script: |
