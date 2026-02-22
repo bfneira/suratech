@@ -46,7 +46,7 @@ stages:
             inputs:
               mavenPomFile: "pom.xml"
               goals: "clean package"
-              options: "-DskipTests"
+              options: "-DskipTests -Dmaven.repo.local=$(mavenCache)"
               publishJUnitResults: false
 
           - publish: "$(System.DefaultWorkingDirectory)/target"

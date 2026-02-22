@@ -21,6 +21,7 @@ services:
       retries: 20
 
   quotes-aggregator:
+    image: ${APP_IMAGE:-suratech:local}
     build:
       context: .
       dockerfile: Dockerfile
