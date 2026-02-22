@@ -37,6 +37,7 @@ resilience4j:
         slidingWindowSize: 20
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
+
   retry:
     instances:
       pricing:
@@ -49,3 +50,12 @@ resilience4j:
         waitDuration: 100ms
         enableExponentialBackoff: true
         exponentialBackoffMultiplier: 2
+
+  bulkhead:
+    instances:
+      pricing:
+        maxConcurrentCalls: 50
+        maxWaitDuration: 0
+      tax:
+        maxConcurrentCalls: 50
+        maxWaitDuration: 0
