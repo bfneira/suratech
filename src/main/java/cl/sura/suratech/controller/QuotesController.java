@@ -8,7 +8,7 @@ import jakarta.validation.Valid;
 import org.slf4j.MDC;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-import static cl.sura.suratech.common.Constantes.*;
+import static cl.sura.suratech.common.Constants.*;
 
 import java.net.URI;
 import java.util.UUID;
