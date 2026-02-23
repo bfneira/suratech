@@ -22,7 +22,7 @@
 ---
 
 ## 2) Architecture Summary
-**Runtime**: Java 17 + Spring Boot  
+**Runtime**: Java 21 + Spring Boot  
 **Data store**: SQL database (quotes + idempotency records)  
 **Deployment**: Docker image deployed to Kubernetes  
 **CI/CD**: Azure DevOps pipeline builds, tests, builds image, runs integration smoke tests  
