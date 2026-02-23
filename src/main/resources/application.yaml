@@ -20,11 +20,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics,prometheus,scheduledtasks
   endpoint:
-    health:
-      probes:
-        enabled: true
+    scheduledtasks:
+      enabled: true
 
 idempotency:
   ttlSeconds: ${IDEMPOTENCY_TTL_SECONDS}
@@ -77,6 +76,6 @@ app:
 
   messaging:
     servicebus:
-      enabled: true
+      enabled: false
       connection-string: ${AZURE_SERVICEBUS_CONNECTION_STRING:}
       topic: ${AZURE_SERVICEBUS_TOPIC:quotes}

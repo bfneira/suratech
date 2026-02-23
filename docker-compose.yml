@@ -40,7 +40,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: root
 
       MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
-      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info"
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,metrics,prometheus,scheduledtasks"
 
       APP_MESSAGING_SERVICEBUS_ENABLED: "false"
 

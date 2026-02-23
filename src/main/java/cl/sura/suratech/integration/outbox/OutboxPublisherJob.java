@@ -2,6 +2,7 @@ package cl.sura.suratech.integration.outbox;
 
 import cl.sura.suratech.entity.OutboxEventEntity;
 import cl.sura.suratech.integration.servicebus.QuoteIssuedPublisher;
+import cl.sura.suratech.integration.servicebus.impl.QuoteIssuedPublisherImpl;
 import cl.sura.suratech.repository.OutboxEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +23,6 @@ import java.util.List;
         havingValue = "true",
         matchIfMissing = true
 )
-@ConditionalOnBean(QuoteIssuedPublisher.class)
 public class OutboxPublisherJob {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxPublisherJob.class);
@@ -54,6 +54,7 @@ public class OutboxPublisherJob {
     @Scheduled(fixedDelayString = "${app.outbox.poll.fixed-delay:1000}")
     @Transactional
     public void tick() {
+        log.info("Running outbox job...");
         if (!enabled) return;
         publishBatch();
     }

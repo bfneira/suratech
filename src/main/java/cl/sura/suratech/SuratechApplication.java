@@ -7,9 +7,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableScheduling
 public class SuratechApplication {
-
     public static void main(String[] args) {
         SpringApplication.run(SuratechApplication.class, args);
     }
-
 }
