@@ -4,47 +4,47 @@ This allowed the generated solutions to be aligned with the existing architectur
 # 1.- OpenAPI 3.0 Prompt
 
 ```Context:
-Proof of concept cloud architecture using OpenAPI 3.0.
-
-Objective:
-Generate a complete and valid OpenAPI 3.0.x specification for:
-
-POST /api/v1/quotes
-
-Requirements:
-
-1) Idempotency:
-  - Required header: Idempotency-Key (UUID v4).
-  - Behavior:
-    a) Same Idempotency-Key + identical body => return 200 with the original response.
-    b) Same Idempotency-Key + different body => return 409 Conflict.
-  - Document idempotency behavior in the operation description.
-  - Include response codes: 201 (created), 200 (idempotent replay), 409 (conflict).
-
-2) Validation:
-  - Define strict request and response schemas.
-  - Include required fields, min/max constraints, string patterns, enums, and proper formats (uuid, date-time, decimal).
-  - Add realistic examples.
-  - Disallow additionalProperties where appropriate.
-
-3) Error Model:
-  - Use application/problem+json (RFC7807).
-  - Include responses: 400, 409, 422, 429, 500.
-  - Define a reusable ProblemDetails schema in components.
-
-4) Additional Requirements:
-  - Include optional X-Correlation-Id header.
-  - Define operationId.
-  - Use tags.
-  - Use components/schemas for all reusable models.
-  - Follow REST naming conventions.
-  - Use server URL placeholder http://localhost:8080/
-
-Output Rules:
-- Output ONLY the openapi.yaml content.
-- The file must be valid OpenAPI 3.0.x YAML.
-- No explanations, no commentary.
-- The entire specification must be written in English.
+  Proof-of-concept architecture using OpenAPI 3.0.
+  
+  Objective:
+  Generate a complete and valid OpenAPI 3.0.x specification for:
+  
+  POST /api/v1/quotes
+  
+  Requirements:
+  
+  1) Idempotency:
+    - Required header: Idempotency-Key (UUID v4).
+    - Behavior:
+      a) Same Idempotency-Key + identical body => return 200 with the original response.
+      b) Same Idempotency-Key + different body => return 409 Conflict.
+    - Document idempotency behavior in the operation description.
+    - Include response codes: 201 (created), 200 (idempotent replay), 409 (conflict).
+  
+  2) Validation:
+    - Define strict request and response schemas.
+    - Include required fields, min/max constraints, string patterns, enums, and proper formats (uuid, date-time, decimal).
+    - Add realistic examples.
+    - Disallow additionalProperties where appropriate.
+  
+  3) Error Model:
+    - Use application/problem+json (RFC7807).
+    - Include responses: 400, 409, 422, 429, 500.
+    - Define a reusable ProblemDetails schema in components.
+  
+  4) Additional Requirements:
+    - Include optional X-Correlation-Id header.
+    - Define operationId.
+    - Use tags.
+    - Use components/schemas for all reusable models.
+    - Follow REST naming conventions.
+    - Use server URL placeholder http://localhost:8080/
+  
+  Output Rules:
+  - Output ONLY the openapi.yaml content.
+  - The file must be valid OpenAPI 3.0.x YAML.
+  - No explanations, no commentary.
+  - The entire specification must be written in English.
 ```
 
 Output:
