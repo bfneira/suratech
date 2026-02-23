@@ -2,11 +2,17 @@ package cl.sura.suratech.integration.servicebus;
 
 import com.azure.messaging.servicebus.ServiceBusMessage;
 import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 
 @Component
+@ConditionalOnProperty(
+        name = "app.messaging.servicebus.enabled",
+        havingValue = "true",
+        matchIfMissing = false
+)
 public class QuoteIssuedPublisher {
 
     private final ServiceBusSenderClient sender;
