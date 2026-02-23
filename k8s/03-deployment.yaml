@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
         - name: suratech
-          image: "usersura/suratech:1.0.3"
-          imagePullPolicy: IfNotPresent
+          image: suratech:local
+          imagePullPolicy: Never
           ports:
             - name: http
               containerPort: 8080
