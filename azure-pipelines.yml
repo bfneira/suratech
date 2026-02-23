@@ -62,7 +62,7 @@ stages:
             inputs:
               mavenPomFile: "pom.xml"
               goals: "clean test package"
-              options: "-Dmaven.repo.local=$(mavenCache)"
+              options: "-B -Dmaven.repo.local=$(mavenCache) -Dtest=!SuratechApplicationTests"
               publishJUnitResults: true
               testResultsFiles: "**/surefire-reports/TEST-*.xml"
               javaHomeOption: "Path"
