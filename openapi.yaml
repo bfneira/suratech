@@ -1,0 +1,633 @@
+openapi: 3.0.3
+info:
+  title: Quotes API (PoC)
+  version: 1.0.0
+  description: Proof of concept cloud architecture using OpenAPI 3.0, Azure DevOps, SQL and k6.
+
+servers:
+  - url: https://api.example.com
+    description: Server URL placeholder
+
+tags:
+  - name: Quotes
+    description: Quote creation and idempotent replay
+
+paths:
+  /api/v1/quotes:
+    post:
+      tags: [Quotes]
+      operationId: createQuote
+      summary: Create a quote (idempotent)
+      description: |
+        Creates a new quote.
+
+        Idempotency
+        - Required header: `Idempotency-Key` (UUID v4).
+        - Behavior:
+          a) Same `Idempotency-Key` + identical request body => return **200** with the **original response** (idempotent replay; do not create duplicates).
+          b) Same `Idempotency-Key` + different request body => return **409 Conflict** with `application/problem+json`.
+
+        Recommended TTL & storage notes (SQL-friendly)
+        - Recommended TTL for idempotency records: **24 hours** (adjust based on retry window and volume).
+        - Store: `idempotency_key` (PK, UUID/BINARY(16)), `request_hash` (SHA-256, CHAR(64) hex or BINARY(32)),
+          `quote_id` (UUID/BINARY(16)), `created_at`, `expires_at`.
+        - Index `expires_at` for cleanup; periodically delete expired rows.
+
+        Observability
+        - Optional header: `X-Correlation-Id` to correlate logs/traces across services.
+        - The server should echo it back (or generate one if missing).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/XCorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteCreateRequest"
+            examples:
+              validRequest:
+                summary: Valid request
+                value:
+                  documentId: "DOC-2026-000001"
+                  currency: "CLP"
+                  customer:
+                    id: "CUST-12345"
+                    email: "customer@example.com"
+                  items:
+                    - sku: "SKU-001"
+                      name: "Item 1"
+                      quantity: 2
+                      unitPrice: 10000.00
+                      taxRate: 0.19
+                  expiresAt: "2026-03-01T12:00:00Z"
+                  metadata:
+                    channel: "web"
+                    campaign: "summer"
+      responses:
+        "201":
+          description: Created (new quote)
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/XCorrelationId"
+            Idempotency-Replayed:
+              $ref: "#/components/headers/IdempotencyReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteResponse"
+              examples:
+                created:
+                  summary: Created quote
+                  value:
+                    id: "b0db4b2c-9de2-4c23-8f22-4adf4d62c3fa"
+                    documentId: "DOC-2026-000001"
+                    status: "ISSUED"
+                    currency: "CLP"
+                    customer:
+                      id: "CUST-12345"
+                      email: "customer@example.com"
+                    items:
+                      - sku: "SKU-001"
+                        name: "Item 1"
+                        quantity: 2
+                        unitPrice: 10000.00
+                        taxRate: 0.19
+                        lineTotal: 20000.00
+                        taxAmount: 3800.00
+                    totals:
+                      subtotal: 20000.00
+                      taxTotal: 3800.00
+                      grandTotal: 23800.00
+                    expiresAt: "2026-03-01T12:00:00Z"
+                    createdAt: "2026-02-23T12:00:00Z"
+                    metadata:
+                      channel: "web"
+                      campaign: "summer"
+        "200":
+          description: OK (idempotent replay; same Idempotency-Key + identical body)
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/XCorrelationId"
+            Idempotency-Replayed:
+              $ref: "#/components/headers/IdempotencyReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteResponse"
+              examples:
+                replay:
+                  summary: Replay of the original response
+                  value:
+                    id: "b0db4b2c-9de2-4c23-8f22-4adf4d62c3fa"
+                    documentId: "DOC-2026-000001"
+                    status: "ISSUED"
+                    currency: "CLP"
+                    customer:
+                      id: "CUST-12345"
+                      email: "customer@example.com"
+                    items:
+                      - sku: "SKU-001"
+                        name: "Item 1"
+                        quantity: 2
+                        unitPrice: 10000.00
+                        taxRate: 0.19
+                        lineTotal: 20000.00
+                        taxAmount: 3800.00
+                    totals:
+                      subtotal: 20000.00
+                      taxTotal: 3800.00
+                      grandTotal: 23800.00
+                    expiresAt: "2026-03-01T12:00:00Z"
+                    createdAt: "2026-02-23T12:00:00Z"
+                    metadata:
+                      channel: "web"
+                      campaign: "summer"
+        "400":
+          $ref: "#/components/responses/Problem400"
+        "409":
+          $ref: "#/components/responses/Problem409"
+        "422":
+          $ref: "#/components/responses/Problem422"
+        "429":
+          $ref: "#/components/responses/Problem429"
+        "500":
+          $ref: "#/components/responses/Problem500"
+
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID v4 idempotency key for safely retrying POST requests.
+      schema:
+        type: string
+        format: uuid
+        pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+      example: "2f4c4d7a-9b3f-4b2a-9f2b-8a2d2e4e1a11"
+
+    XCorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Correlation identifier for distributed tracing/log correlation. Echoed back by the server.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: "^[A-Za-z0-9._:-]{1,128}$"
+      example: "b4f7a1c0-1db2-4b0d-9cc5-61a0bce1f3dd"
+
+  headers:
+    XCorrelationId:
+      description: Correlation identifier echoed (or generated) by the server.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: "^[A-Za-z0-9._:-]{1,128}$"
+
+    IdempotencyReplayed:
+      description: Indicates whether the response is an idempotent replay of a previous successful request.
+      schema:
+        type: boolean
+      example: false
+
+  responses:
+    Problem400:
+      description: Bad Request
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/XCorrelationId"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          examples:
+            missingIdempotencyKey:
+              summary: Missing required header
+              value:
+                type: "https://errors.example.com/bad-request"
+                title: "Bad Request"
+                status: 400
+                detail: "Missing required header: Idempotency-Key"
+                instance: "/api/v1/quotes"
+                correlationId: "b4f7a1c0-1db2-4b0d-9cc5-61a0bce1f3dd"
+                code: "bad_request"
+
+    Problem409:
+      description: Conflict (idempotency key reused with different body)
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/XCorrelationId"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          examples:
+            idempotencyConflict:
+              summary: Idempotency conflict
+              value:
+                type: "https://errors.example.com/idempotency-conflict"
+                title: "Conflict"
+                status: 409
+                detail: "Same Idempotency-Key was used with a different request body."
+                instance: "/api/v1/quotes"
+                correlationId: "b4f7a1c0-1db2-4b0d-9cc5-61a0bce1f3dd"
+                code: "idempotency_conflict"
+
+    Problem422:
+      description: Unprocessable Entity (validation errors)
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/XCorrelationId"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          examples:
+            validationError:
+              summary: Field-level validation failed
+              value:
+                type: "https://errors.example.com/validation-error"
+                title: "Unprocessable Entity"
+                status: 422
+                detail: "Request validation failed."
+                instance: "/api/v1/quotes"
+                correlationId: "b4f7a1c0-1db2-4b0d-9cc5-61a0bce1f3dd"
+                code: "validation_error"
+                errors:
+                  - field: "items[0].quantity"
+                    reason: "must be >= 1"
+                    rule: "minimum"
+                    value: 0
+
+    Problem429:
+      description: Too Many Requests
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/XCorrelationId"
+        Retry-After:
+          description: Delay in seconds before retrying.
+          schema:
+            type: integer
+            minimum: 1
+          example: 2
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          examples:
+            rateLimited:
+              summary: Rate limit exceeded
+              value:
+                type: "https://errors.example.com/rate-limit"
+                title: "Too Many Requests"
+                status: 429
+                detail: "Rate limit exceeded."
+                instance: "/api/v1/quotes"
+                correlationId: "b4f7a1c0-1db2-4b0d-9cc5-61a0bce1f3dd"
+                code: "too_many_requests"
+
+    Problem500:
+      description: Internal Server Error
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/XCorrelationId"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          examples:
+            internalError:
+              summary: Unexpected error
+              value:
+                type: "https://errors.example.com/internal"
+                title: "Internal Server Error"
+                status: 500
+                detail: "Unexpected server error."
+                instance: "/api/v1/quotes"
+                correlationId: "b4f7a1c0-1db2-4b0d-9cc5-61a0bce1f3dd"
+                code: "internal_error"
+
+  schemas:
+    QuoteCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - documentId
+        - currency
+        - customer
+        - items
+        - expiresAt
+      properties:
+        documentId:
+          type: string
+          description: Client-provided document/order identifier.
+          minLength: 1
+          maxLength: 64
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+          example: "DOC-2026-000001"
+        currency:
+          type: string
+          description: Currency (PoC subset of ISO 4217).
+          enum: [CLP, USD, EUR]
+          example: "CLP"
+        customer:
+          $ref: "#/components/schemas/Customer"
+        items:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/QuoteItemCreate"
+        expiresAt:
+          type: string
+          format: date-time
+          description: RFC3339 date-time when the quote expires.
+          example: "2026-03-01T12:00:00Z"
+        metadata:
+          type: object
+          description: Extensible key/value metadata.
+          maxProperties: 50
+          additionalProperties:
+            type: string
+            maxLength: 256
+          example:
+            channel: "web"
+            campaign: "summer"
+
+    Customer:
+      type: object
+      additionalProperties: false
+      required: [id, email]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+          example: "CUST-12345"
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          example: "customer@example.com"
+
+    QuoteItemCreate:
+      type: object
+      additionalProperties: false
+      required: [sku, name, quantity, unitPrice, taxRate]
+      properties:
+        sku:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+          example: "SKU-001"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "Item 1"
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          example: 2
+        unitPrice:
+          type: number
+          format: double
+          description: Unit price (decimal).
+          minimum: 0
+          maximum: 1000000000
+          multipleOf: 0.01
+          example: 10000.0
+        taxRate:
+          type: number
+          format: double
+          description: Tax rate in range 0..1 (e.g., 0.19 = 19%).
+          minimum: 0
+          maximum: 1
+          multipleOf: 0.0001
+          example: 0.19
+
+    QuoteResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - documentId
+        - status
+        - currency
+        - customer
+        - items
+        - totals
+        - expiresAt
+        - createdAt
+        - metadata
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "b0db4b2c-9de2-4c23-8f22-4adf4d62c3fa"
+        documentId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: "DOC-2026-000001"
+        status:
+          type: string
+          enum: [ISSUED]
+          example: "ISSUED"
+        currency:
+          type: string
+          enum: [CLP, USD, EUR]
+          example: "CLP"
+        customer:
+          $ref: "#/components/schemas/Customer"
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/QuoteItemResponse"
+        totals:
+          $ref: "#/components/schemas/QuoteTotals"
+        expiresAt:
+          type: string
+          format: date-time
+          example: "2026-03-01T12:00:00Z"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-02-23T12:00:00Z"
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            channel: "web"
+            campaign: "summer"
+
+    QuoteItemResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - sku
+        - name
+        - quantity
+        - unitPrice
+        - taxRate
+        - lineTotal
+        - taxAmount
+      properties:
+        sku:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: "SKU-001"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "Item 1"
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          example: 2
+        unitPrice:
+          type: number
+          format: double
+          minimum: 0
+          multipleOf: 0.01
+          example: 10000.0
+        taxRate:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          multipleOf: 0.0001
+          example: 0.19
+        lineTotal:
+          type: number
+          format: double
+          minimum: 0
+          multipleOf: 0.01
+          example: 20000.0
+        taxAmount:
+          type: number
+          format: double
+          minimum: 0
+          multipleOf: 0.01
+          example: 3800.0
+
+    QuoteTotals:
+      type: object
+      additionalProperties: false
+      required: [subtotal, taxTotal, grandTotal]
+      properties:
+        subtotal:
+          type: number
+          format: double
+          minimum: 0
+          multipleOf: 0.01
+          example: 20000.0
+        taxTotal:
+          type: number
+          format: double
+          minimum: 0
+          multipleOf: 0.01
+          example: 3800.0
+        grandTotal:
+          type: number
+          format: double
+          minimum: 0
+          multipleOf: 0.01
+          example: 23800.0
+
+    ProblemDetails:
+      type: object
+      description: RFC7807 problem details (application/problem+json) with extensions.
+      additionalProperties: true
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI reference that identifies the problem type.
+          example: "https://errors.example.com/validation-error"
+        title:
+          type: string
+          description: Short, human-readable summary of the problem type.
+          minLength: 1
+          maxLength: 200
+          example: "Validation Error"
+        status:
+          type: integer
+          format: int32
+          description: HTTP status code.
+          minimum: 100
+          maximum: 599
+          example: 422
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence of the problem.
+          maxLength: 2048
+          example: "Request validation failed."
+        instance:
+          type: string
+          description: URI reference that identifies the specific occurrence of the problem.
+          maxLength: 2048
+          example: "/api/v1/quotes"
+        correlationId:
+          type: string
+          description: Correlation identifier (matches X-Correlation-Id header).
+          minLength: 1
+          maxLength: 128
+          example: "b4f7a1c0-1db2-4b0d-9cc5-61a0bce1f3dd"
+        code:
+          type: string
+          description: Stable, machine-readable error code.
+          minLength: 1
+          maxLength: 64
+          example: "validation_error"
+        errors:
+          type: array
+          description: Optional field-level validation errors (extension).
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/ProblemFieldError"
+
+    ProblemFieldError:
+      type: object
+      additionalProperties: false
+      required: [field, reason]
+      properties:
+        field:
+          type: string
+          minLength: 1
+          maxLength: 256
+          example: "items[0].quantity"
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 512
+          example: "must be >= 1"
+        rule:
+          type: string
+          description: Constraint/rule name (e.g., minimum, pattern, enum).
+          minLength: 1
+          maxLength: 64
+          example: "minimum"
+        value:
+          description: Rejected value (if applicable).
+          nullable: true
+          oneOf:
+            - type: string
+            - type: number
+            - type: integer
+            - type: boolean
+            - type: object
+            - type: array
