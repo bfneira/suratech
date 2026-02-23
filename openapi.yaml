@@ -5,8 +5,8 @@ info:
   description: Proof of concept cloud architecture using OpenAPI 3.0, Azure DevOps, SQL and k6.
 
 servers:
-  - url: https://api.example.com
-    description: Server URL placeholder
+  - url: http://localhost:8080
+    description: Local development
 
 tags:
   - name: Quotes
