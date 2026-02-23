@@ -89,7 +89,6 @@ class IdempotencyServiceImplTest {
                 OffsetDateTime.parse("2026-02-23T12:00:00Z")
         );
 
-        // OJO: esto debe calzar con tu implementación real:
         String hash = sha256Hex(request.toString());
 
         UUID quoteId = UUID.fromString(created.id());
