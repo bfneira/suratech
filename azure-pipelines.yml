@@ -10,7 +10,7 @@ pr:
       - "*"
 
 variables:
-  agentPool: "self-hosted"   # Nombre EXACTO del Agent Pool en Azure DevOps
+  agentPool: "self-hosted"           # Nombre EXACTO del Agent Pool en Azure DevOps
   mavenCache: "$(Pipeline.Workspace)/.m2/repository"
   imageName: "suratech"
   imageTag: "$(Build.BuildId)"
@@ -26,9 +26,9 @@ stages:
           name: "$(agentPool)"
         steps:
           - script: |
-              echo "Agent: $(Agent.Name)"
-              echo "OS: $(Agent.OS)"
-              echo "JAVA_HOME=%JAVA_HOME%"
+              echo Agent: $(Agent.Name)
+              echo OS: $(Agent.OS)
+              echo JAVA_HOME=%JAVA_HOME%
               where java || exit /b 1
               java -version || exit /b 1
               where mvn || exit /b 1
@@ -126,37 +126,46 @@ stages:
             displayName: "docker compose up"
 
           - script: |
-              @echo off
-              setlocal EnableExtensions EnableDelayedExpansion
+              docker compose ps
+              docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            displayName: "Debug compose ports"
 
-              echo Waiting for readiness...
-              set ready=0
+          - powershell: |
+              $ErrorActionPreference = "Stop"
 
-              for /L %%i in (1,1,60) do (
-                curl -fsS "http://localhost:8080/actuator/health/readiness" | findstr /C:"\"status\":\"UP\"" >nul
-                if !errorlevel! == 0 (
-                  echo Ready
-                  set ready=1
-                  goto :done
-                )
-                timeout /t 2 /nobreak >nul
-              )
+              Write-Host "Waiting for readiness..."
+              $ready = $false
 
-              :done
-              if "%ready%"=="0" (
-                echo ERROR: App never became ready
-                docker compose ps
-                docker compose logs --no-color
-                exit /b 1
-              )
+              for ($i=1; $i -le 60; $i++) {
+                try {
+                  $resp = Invoke-RestMethod -Uri "http://localhost:8080/actuator/health/readiness" -TimeoutSec 2
+                  if ($resp.status -eq "UP") {
+                    Write-Host "Ready"
+                    $ready = $true
+                    break
+                  }
+                } catch {
+                  Write-Host "Not ready yet ($i/60): $($_.Exception.Message)"
+                }
+                Start-Sleep -Seconds 2
+              }
 
-              echo Calling liveness...
-              curl -fsS "http://localhost:8080/actuator/health/liveness" | findstr /C:"\"status\":\"UP\"" >nul
-              if errorlevel 1 exit /b 1
+              if (-not $ready) {
+                Write-Host "ERROR: App never became ready"
+                docker compose ps | Out-String | Write-Host
+                docker compose logs --no-color | Out-String | Write-Host
+                throw "Readiness failed"
+              }
 
-              echo Calling health...
-              curl -fsS "http://localhost:8080/actuator/health" | findstr /C:"\"status\":\"UP\"" >nul
-              if errorlevel 1 exit /b 1
+              Write-Host "Calling liveness..."
+              $live = Invoke-RestMethod -Uri "http://localhost:8080/actuator/health/liveness" -TimeoutSec 5
+              if ($live.status -ne "UP") { throw "Liveness not UP" }
+
+              Write-Host "Calling health..."
+              $health = Invoke-RestMethod -Uri "http://localhost:8080/actuator/health" -TimeoutSec 5
+              if ($health.status -ne "UP") { throw "Health not UP" }
+
+              Write-Host "Smoke tests passed."
             displayName: "Integration smoke tests"
 
           - script: |
