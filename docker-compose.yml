@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   mysql:
     image: mysql:8.0
@@ -32,6 +34,7 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: ci
+
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/suratech?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: usersura
       SPRING_DATASOURCE_PASSWORD: root
@@ -39,8 +42,9 @@ services:
       MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info"
 
+      APP_MESSAGING_SERVICEBUS_ENABLED: "false"
+
       IDEMPOTENCY_TTL_SECONDS: "86400"
-      AZURE_SERVICEBUS_ENABLED: "false"
 
     ports:
       - "8080:8080"
