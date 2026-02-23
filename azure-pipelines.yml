@@ -16,6 +16,10 @@ variables:
   imageTag: "$(Build.BuildId)"
   fullImageName: "$(imageName):$(imageTag)"
 
+  # Ajusta estas rutas a TU PC (self-hosted agent)
+  javaHome: "C:\\Program Files\\Java\\jdk-21"
+  mavenHome: "C:\\apache-maven-3.9.6"
+
 stages:
   - stage: BuildAndTest
     displayName: "Build + Test (Maven)"
@@ -28,11 +32,21 @@ stages:
           - script: |
               echo Agent: $(Agent.Name)
               echo OS: $(Agent.OS)
+
+              set "JAVA_HOME=$(javaHome)"
+              set "MAVEN_HOME=$(mavenHome)"
+              set "PATH=%JAVA_HOME%\bin;%MAVEN_HOME%\bin;%PATH%"
+
               echo JAVA_HOME=%JAVA_HOME%
+              echo MAVEN_HOME=%MAVEN_HOME%
+
               where java || exit /b 1
               java -version || exit /b 1
+
               where mvn || exit /b 1
               mvn -version || exit /b 1
+
+              where docker || exit /b 1
               docker --version || exit /b 1
               docker compose version || exit /b 1
             displayName: "Verify tools (Java/Maven/Docker)"
@@ -76,6 +90,18 @@ stages:
         pool:
           name: "$(agentPool)"
         steps:
+          - script: |
+              echo Agent: $(Agent.Name)
+              echo OS: $(Agent.OS)
+
+              set "JAVA_HOME=$(javaHome)"
+              set "MAVEN_HOME=$(mavenHome)"
+              set "PATH=%JAVA_HOME%\bin;%MAVEN_HOME%\bin;%PATH%"
+
+              where docker || exit /b 1
+              docker --version || exit /b 1
+            displayName: "Verify docker (self-hosted)"
+
           - task: Docker@2
             displayName: "Docker build"
             inputs:
@@ -108,6 +134,19 @@ stages:
         pool:
           name: "$(agentPool)"
         steps:
+          - script: |
+              echo Agent: $(Agent.Name)
+              echo OS: $(Agent.OS)
+
+              set "JAVA_HOME=$(javaHome)"
+              set "MAVEN_HOME=$(mavenHome)"
+              set "PATH=%JAVA_HOME%\bin;%MAVEN_HOME%\bin;%PATH%"
+
+              where docker || exit /b 1
+              docker --version || exit /b 1
+              docker compose version || exit /b 1
+            displayName: "Verify docker compose (self-hosted)"
+
           - download: current
             artifact: "docker-image"
             displayName: "Download image artifact"
@@ -118,9 +157,8 @@ stages:
             displayName: "docker load image"
 
           - script: |
-              set APP_IMAGE=$(fullImageName)
+              set "APP_IMAGE=$(fullImageName)"
               echo APP_IMAGE=%APP_IMAGE%
-              docker compose version
               docker compose up -d
               docker compose ps
             displayName: "docker compose up"
