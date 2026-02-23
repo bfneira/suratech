@@ -77,7 +77,7 @@ public class OutboxPublisherJob {
                 publisher.publishCloudEventJson(
                         e.getEventId(),
                         e.getAggregateId(),
-                        e.getPayloadJson()
+                        e.getPayloadJson().toString()
                 );
 
                 e.setStatus(OutboxEvent.Status.SENT);

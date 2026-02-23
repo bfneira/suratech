@@ -29,7 +29,7 @@ public class QuoteMapper {
                 new QuoteResponse.Totals(quoteEntity.getSubtotal(), quoteEntity.getTaxTotal(), quoteEntity.getGrandTotal()),
                 quoteEntity.getExpiresAt(),
                 quoteEntity.getCreatedAt(),
-                fromJson(quoteEntity.getMetadataJson())
+                fromJson(quoteEntity.getPayloadJson())
         );
     }
 

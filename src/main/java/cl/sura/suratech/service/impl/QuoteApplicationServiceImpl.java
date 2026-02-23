@@ -55,7 +55,7 @@ public class QuoteApplicationServiceImpl implements QuoteApplicationService {
         entity.setExpiresAt(request.expiresAt());
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
-        entity.setMetadataJson(mapper.toJson(request.metadata()));
+        entity.setPayloadJson(mapper.toJson(request.metadata()));
 
         for (var it : agg.items()) {
             QuoteItemEntity item = new QuoteItemEntity();

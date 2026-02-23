@@ -3,6 +3,8 @@ package cl.sura.suratech.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -54,8 +56,9 @@ public class QuoteEntity {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
-    @Column(name = "metadata_json", columnDefinition = "JSON")
-    private String metadataJson;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "payload_json", columnDefinition = "json", nullable = false)
+    private String payloadJson;
 
     @OneToMany(mappedBy = "quote", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<QuoteItemEntity> items = new ArrayList<>();

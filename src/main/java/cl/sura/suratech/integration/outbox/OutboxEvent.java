@@ -1,9 +1,12 @@
 package cl.sura.suratech.integration.outbox;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 
@@ -32,9 +35,9 @@ public class OutboxEvent {
     @Column(nullable = false, length = 100)
     private String aggregateId;
 
-    @Lob
-    @Column(nullable = false)
-    private String payloadJson;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "payload_json", columnDefinition = "json", nullable = false)
+    private JsonNode payloadJson;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
