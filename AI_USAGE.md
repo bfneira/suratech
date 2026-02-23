@@ -157,7 +157,7 @@ The load tests are located in the performance/k6 folder, in the file post_quotes
 ```
   Context
     Cloud-based REST API service exposing POST /api/v1/quotes.  
-    Stack: Java 17, Spring Boot, SQL database.  
+    Stack: Java 21, Spring Boot, SQL database.  
     Deployed in Docker/Kubernetes.  
     CI/CD via Azure DevOps.  
     Performance testing via k6.  
