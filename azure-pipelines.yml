@@ -10,7 +10,7 @@ pr:
       - "*"
 
 variables:
-  agentPool: "self-hosted"           # Nombre EXACTO del Agent Pool en Azure DevOps
+  agentPool: "self-hosted"
   mavenCache: "$(Pipeline.Workspace)/.m2/repository"
   imageName: "suratech"
   imageTag: "$(Build.BuildId)"
@@ -125,10 +125,15 @@ stages:
               docker compose ps
             displayName: "docker compose up"
 
-          - script: |
+          - powershell: |
               docker compose ps
               docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-            displayName: "Debug compose ports"
+            displayName: "Debug: containers status & ports"
+
+          - powershell: |
+              Write-Host "Last 200 lines of compose logs:"
+              docker compose logs --no-color --tail=200
+            displayName: "Debug: compose logs (tail 200)"
 
           - powershell: |
               $ErrorActionPreference = "Stop"
