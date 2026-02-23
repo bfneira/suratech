@@ -1,7 +1,9 @@
 package cl.sura.suratech.integration.outbox;
 
+import cl.sura.suratech.entity.OutboxEventEntity;
 import cl.sura.suratech.integration.events.CloudEvent;
 import cl.sura.suratech.integration.events.QuoteIssuedEvent;
+import cl.sura.suratech.repository.OutboxEventRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -43,13 +45,13 @@ public class QuoteIssuedOutboxService {
 
             JsonNode payloadJson = objectMapper.valueToTree(cloudEvent);
 
-            OutboxEvent e = new OutboxEvent();
+            OutboxEventEntity e = new OutboxEventEntity();
             e.setEventId(eventId);
             e.setEventType(EVENT_TYPE);
             e.setAggregateType("Quote");
             e.setAggregateId(data.quoteId());
             e.setPayloadJson(payloadJson);
-            e.setStatus(OutboxEvent.Status.NEW);
+            e.setStatus(OutboxEventEntity.Status.NEW);
             e.setAttempts(0);
             e.setNextAttemptAt(now);
             e.setCreatedAt(now);

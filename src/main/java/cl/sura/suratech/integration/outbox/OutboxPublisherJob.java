@@ -1,6 +1,8 @@
 package cl.sura.suratech.integration.outbox;
 
+import cl.sura.suratech.entity.OutboxEventEntity;
 import cl.sura.suratech.integration.servicebus.QuoteIssuedPublisher;
+import cl.sura.suratech.repository.OutboxEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,20 +61,20 @@ public class OutboxPublisherJob {
     protected void publishBatch() {
         OffsetDateTime now = OffsetDateTime.now();
 
-        List<OutboxEvent> batch = outboxRepository.lockBatchReadyToProcess(
-                OutboxEvent.Status.NEW,
+        List<OutboxEventEntity> batch = outboxRepository.lockBatchReadyToProcess(
+                OutboxEventEntity.Status.NEW,
                 now,
                 PageRequest.of(0, batchSize)
         );
 
         if (batch.isEmpty()) return;
 
-        for (OutboxEvent e : batch) {
-            e.setStatus(OutboxEvent.Status.PROCESSING);
+        for (OutboxEventEntity e : batch) {
+            e.setStatus(OutboxEventEntity.Status.PROCESSING);
         }
         outboxRepository.saveAll(batch);
 
-        for (OutboxEvent e : batch) {
+        for (OutboxEventEntity e : batch) {
             try {
                 publisher.publishCloudEventJson(
                         e.getEventId(),
@@ -80,7 +82,7 @@ public class OutboxPublisherJob {
                         e.getPayloadJson().toString()
                 );
 
-                e.setStatus(OutboxEvent.Status.SENT);
+                e.setStatus(OutboxEventEntity.Status.SENT);
                 e.setLastError(null);
                 log.info("outbox.published eventId={} type={} aggregateId={}", e.getEventId(), e.getEventType(), e.getAggregateId());
             } catch (Exception ex) {
@@ -88,9 +90,9 @@ public class OutboxPublisherJob {
                 e.setAttempts(attempts);
 
                 if (attempts >= maxAttempts) {
-                    e.setStatus(OutboxEvent.Status.FAILED);
+                    e.setStatus(OutboxEventEntity.Status.FAILED);
                 } else {
-                    e.setStatus(OutboxEvent.Status.NEW);
+                    e.setStatus(OutboxEventEntity.Status.NEW);
                     e.setNextAttemptAt(OffsetDateTime.now().plusNanos(backoffNanos(attempts)));
                 }
 

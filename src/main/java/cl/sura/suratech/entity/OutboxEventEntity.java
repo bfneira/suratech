@@ -1,4 +1,4 @@
-package cl.sura.suratech.integration.outbox;
+package cl.sura.suratech.entity;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
@@ -17,7 +17,7 @@ import java.time.OffsetDateTime;
 @Table(name = "outbox_event",
         indexes = @Index(name = "idx_outbox_status_next", columnList = "status,nextAttemptAt"),
         uniqueConstraints = @UniqueConstraint(name = "uk_outbox_event_event_id", columnNames = "eventId"))
-public class OutboxEvent {
+public class OutboxEventEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
