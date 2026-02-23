@@ -10,8 +10,7 @@ pr:
       - "*"
 
 variables:
-  agentPool: "self-hosted"
-  javaVersion: "21"
+  agentPool: "self-hosted"   # Nombre EXACTO del Agent Pool en Azure DevOps
   mavenCache: "$(Pipeline.Workspace)/.m2/repository"
   imageName: "suratech"
   imageTag: "$(Build.BuildId)"
@@ -29,11 +28,14 @@ stages:
           - script: |
               echo "Agent: $(Agent.Name)"
               echo "OS: $(Agent.OS)"
-              java -version || true
-              mvn -version || true
-              docker --version || true
-              docker compose version || true
-            displayName: "Print tool versions (debug)"
+              echo "JAVA_HOME=%JAVA_HOME%"
+              where java || exit /b 1
+              java -version || exit /b 1
+              where mvn || exit /b 1
+              mvn -version || exit /b 1
+              docker --version || exit /b 1
+              docker compose version || exit /b 1
+            displayName: "Verify tools (Java/Maven/Docker)"
 
           - task: Cache@2
             displayName: "Cache Maven local repo"
@@ -42,13 +44,6 @@ stages:
               restoreKeys: |
                 maven | "$(Agent.OS)"
               path: "$(mavenCache)"
-
-          - task: JavaToolInstaller@0
-            displayName: "Use Java $(javaVersion)"
-            inputs:
-              versionSpec: "$(javaVersion)"
-              jdkArchitectureOption: "x64"
-              jdkSourceOption: "PreInstalled"
 
           - task: Maven@4
             displayName: "Maven clean test package"
@@ -60,7 +55,7 @@ stages:
               testResultsFiles: "**/surefire-reports/TEST-*.xml"
 
           - task: PublishCodeCoverageResults@2
-            displayName: "Publish code coverage"
+            displayName: "Publish code coverage (si aplica)"
             condition: succeededOrFailed()
             inputs:
               codeCoverageTool: "JaCoCo"
@@ -92,8 +87,8 @@ stages:
                 $(imageTag)
 
           - script: |
-              docker images | head -n 20
-              echo "Built image: $(fullImageName)"
+              docker images | more
+              echo Built image: $(fullImageName)
             displayName: "List images"
 
           - script: |
@@ -118,48 +113,54 @@ stages:
             displayName: "Download image artifact"
 
           - script: |
-              docker load -i "$(Pipeline.Workspace)/docker-image/suratech-image.tar"
-              docker image ls | head -n 20
+              docker load -i "$(Pipeline.Workspace)\docker-image\suratech-image.tar"
+              docker image ls
             displayName: "docker load image"
 
           - script: |
-              set -e
-              export APP_IMAGE="$(fullImageName)"
+              set APP_IMAGE=$(fullImageName)
+              echo APP_IMAGE=%APP_IMAGE%
               docker compose version
-              docker compose up -d --wait || docker compose up -d
+              docker compose up -d
               docker compose ps
             displayName: "docker compose up"
 
           - script: |
-              set -e
+              @echo off
+              setlocal EnableExtensions EnableDelayedExpansion
 
-              echo "Waiting for readiness..."
-              ready=0
-              for i in {1..60}; do
-                if curl -fsS "http://localhost:8080/actuator/health/readiness" | grep -q '"status":"UP"'; then
-                  echo "Ready"
-                  ready=1
-                  break
-                fi
-                sleep 2
-              done
+              echo Waiting for readiness...
+              set ready=0
 
-              if [ $ready -ne 1 ]; then
-                echo "ERROR: App never became ready"
-                docker compose ps || true
-                docker compose logs --no-color || true
-                exit 1
-              fi
+              for /L %%i in (1,1,60) do (
+                curl -fsS "http://localhost:8080/actuator/health/readiness" | findstr /C:"\"status\":\"UP\"" >nul
+                if !errorlevel! == 0 (
+                  echo Ready
+                  set ready=1
+                  goto :done
+                )
+                timeout /t 2 /nobreak >nul
+              )
 
-              echo "Calling liveness..."
-              curl -fsS "http://localhost:8080/actuator/health/liveness" | grep -q '"status":"UP"'
+              :done
+              if "%ready%"=="0" (
+                echo ERROR: App never became ready
+                docker compose ps
+                docker compose logs --no-color
+                exit /b 1
+              )
 
-              echo "Calling health..."
-              curl -fsS "http://localhost:8080/actuator/health" | grep -q '"status":"UP"'
+              echo Calling liveness...
+              curl -fsS "http://localhost:8080/actuator/health/liveness" | findstr /C:"\"status\":\"UP\"" >nul
+              if errorlevel 1 exit /b 1
+
+              echo Calling health...
+              curl -fsS "http://localhost:8080/actuator/health" | findstr /C:"\"status\":\"UP\"" >nul
+              if errorlevel 1 exit /b 1
             displayName: "Integration smoke tests"
 
           - script: |
-              docker compose logs --no-color > docker-compose.logs.txt || true
+              docker compose logs --no-color > docker-compose.logs.txt || exit /b 0
             displayName: "Collect compose logs"
             condition: always()
 
@@ -169,6 +170,6 @@ stages:
             condition: always()
 
           - script: |
-              docker compose down -v --remove-orphans || true
+              docker compose down -v --remove-orphans || exit /b 0
             displayName: "docker compose down"
             condition: always()
