@@ -15,10 +15,8 @@ variables:
   imageName: "suratech"
   imageTag: "$(Build.BuildId)"
   fullImageName: "$(imageName):$(imageTag)"
-
-  # Ajusta estas rutas a TU PC (self-hosted agent)
   javaHome: "C:\\Program Files\\Java\\jdk-21"
-  mavenHome: "C:\\apache-maven-3.9.6"
+  mavenHome: "C:\\maven\\apache-maven-3.9.12"
 
 stages:
   - stage: BuildAndTest
