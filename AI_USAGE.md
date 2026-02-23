@@ -147,7 +147,7 @@ The generated tests were left in the src/test folder.
 
 Output:
 
-The load tests are located in the performance/k6/post_quotes.js folder.
+The load tests are located in the performance/k6 folder, in the file post_quotes.js.
 
 ![Generated Image](https://i.postimg.cc/RVpJvzyX/result3.png)
 
