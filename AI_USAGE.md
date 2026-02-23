@@ -49,6 +49,7 @@ Output Rules:
 
 Output:
 
+The file was placed in the root of the project with the name openapi.yml.
 
 ![Generated Image](https://i.postimg.cc/dtPGzvMd/result1.png)
 
@@ -104,6 +105,7 @@ Output:
 
 Output:
 
+The generated tests were left in the src/test folder.
 
 ![Generated Image](https://i.postimg.cc/1zhxFfbg/result2.png)
 
@@ -145,6 +147,7 @@ Output:
 
 Output:
 
+The load tests are located in the performance/k6/post_quotes.js folder.
 
 ![Generated Image](https://i.postimg.cc/RVpJvzyX/result3.png)
 
@@ -195,5 +198,6 @@ Output:
 
 Output:
 
+The README file is located in the root of the project as README.md
 
 ![Generated Image](https://i.postimg.cc/vTkySX2t/result4.png)
