@@ -1,107 +1,184 @@
-# AI_USAGE.md
+# OpenAPI Specification Prompt
 
-## Table of Contents
+## Context
+Proof of concept cloud architecture using OpenAPI 3.0, Azure DevOps, SQL and k6.
 
-1.  Overview
-2.  OpenAPI Specification Prompt
-3.  Unit Testing Prompt
-4.  k6 Performance Testing Prompt
-5.  Operational Runbook Prompt
+## Objective
+Generate a complete and valid OpenAPI 3.0.x specification for:
 
-------------------------------------------------------------------------
+POST /api/v1/quotes
 
-## Overview
+## Requirements
 
-This document records the AI prompts used during the design and
-implementation of the Quotes API project. All AI outputs were reviewed,
-validated, and adjusted by engineers before acceptance.
+### 1) Idempotency
+- Required header: Idempotency-Key (UUID v4).
+- Behavior:
+  a) Same Idempotency-Key + identical body => return 200 with the original response.
+  b) Same Idempotency-Key + different body => return 409 Conflict.
+- Document idempotency behavior in the operation description.
+- Include response codes: 201 (created), 200 (idempotent replay), 409 (conflict).
 
-------------------------------------------------------------------------
+### 2) Validation
+- Define strict request and response schemas.
+- Include required fields, min/max constraints, string patterns, enums, and proper formats (uuid, date-time, decimal).
+- Add realistic examples.
+- Disallow additionalProperties where appropriate.
 
-## OpenAPI Specification Prompt
+### 3) Error Model
+- Use application/problem+json (RFC7807).
+- Include responses: 400, 409, 422, 429, 500.
+- Define a reusable ProblemDetails schema in components.
 
-### Purpose
+### 4) Additional Requirements
+- Include optional X-Correlation-Id header.
+- Define operationId.
+- Use tags.
+- Use components/schemas for all reusable models.
+- Follow REST naming conventions.
+- Use server URL placeholder (e.g., https://api.example.com).
 
-Generate a complete OpenAPI 3.0.x specification for POST /api/v1/quotes,
-including idempotency, validation, and RFC7807 error modeling.
+## Output Rules
+- Output ONLY the openapi.yaml content.
+- The file must be valid OpenAPI 3.0.x YAML.
+- No explanations, no commentary.
+- The entire specification must be written in English.
 
-### Output Summary
+---
 
--   openapi.yaml specification
--   Idempotency header definition (UUID v4)
--   Request/response schemas
--   ProblemDetails schema
--   Response codes (201, 200, 409, 400, 422, 429, 500)
+# JUnit Test Generation Prompt
 
-### Validation Approach
+## Context
+REST API endpoint: POST /api/v1/quotes.  
+Stack: Java 17, Spring Boot, JUnit 5, Mockito.  
+Idempotency is implemented with required header: Idempotency-Key (UUID v4).
 
--   Validated with Swagger/OpenAPI validator
--   Cross-checked with controller implementation
--   Verified against unit and integration tests
+Behavior:
+- New request -> 201 Created.
+- Same Idempotency-Key + identical body -> 200 OK (replay same response, no duplicate creation).
+- Same Idempotency-Key + different body -> 409 Conflict.
 
-------------------------------------------------------------------------
+## Objective
+Generate production-quality unit tests for the POST /api/v1/quotes flow.
 
-## Unit Testing Prompt (JUnit + Mockito)
+## Requirements
 
-### Purpose
+### 1) Test Layers
+- Controller tests using MockMvc (or WebTestClient if reactive).
+- Service tests using JUnit 5 + Mockito (pure unit tests).
 
-Generate production-quality unit tests for controller and service
-layers, covering idempotency and validation scenarios.
+### 2) Coverage
+- 201 Created: valid request -> service called -> response contains quoteId + createdAt.
+- 200 OK replay: same key + same body -> returns previously stored response; verify no new insert.
+- 409 Conflict: same key + different body -> verify conflict exception and no insert.
+- Validation:
+    - Missing Idempotency-Key -> 400.
+    - Invalid payload (e.g., missing required fields, invalid ranges) -> 400 or 422 (match your contract).
+- Error mapping: ProblemDetails (application/problem+json) if used.
 
-### Output Summary
+### 3) Conventions
+- Use Arrange/Act/Assert.
+- Use descriptive test names.
+- Provide minimal test builders/factories for request DTOs.
+- Mock dependencies (repository, idempotency store, clock/time provider if needed).
+- Verify interactions with Mockito (times/never).
 
--   MockMvc controller tests
--   Service-level unit tests
--   Idempotency replay and conflict scenarios
--   Validation and error handling tests
+## Output Rules
+- Output ONLY code blocks.
+- Separate files with their relative paths as a line above each code block.
+- All content in English.
+- Do not include explanations outside code blocks.
 
-### Validation Approach
+## Assumptions
+- QuotesController, QuotesService, QuotesRepository, IdempotencyStore exist.
+- DTOs: CreateQuoteRequest, QuoteResponse.
+- Exceptions: IdempotencyConflictException, ValidationException (or equivalents).
 
--   Executed via Maven test phase
--   Verified branch coverage
--   Reviewed Mockito interaction verification
+---
 
-------------------------------------------------------------------------
+# k6 Load Testing Script Prompt
 
-## k6 Performance Testing Prompt
+## Context
+REST API endpoint: POST /api/v1/quotes.  
+Performance tool: k6.  
+Idempotency header: Idempotency-Key (UUID v4) is required.
 
-### Purpose
+## Objective
+Generate a k6 load test script to performance test POST /api/v1/quotes with realistic traffic.
 
-Generate a load test script to evaluate POST /api/v1/quotes under
-realistic traffic conditions.
+## Requirements
 
-### Output Summary
+### 1) Script Behavior
+- Base URL from env var: BASE_URL (default http://localhost:8080).
+- Endpoint path: /api/v1/quotes.
+- Content-Type: application/json.
+- Generate a realistic request body (randomized values within valid ranges).
+- For normal load: use a unique Idempotency-Key per request (UUID v4).
+- Also include a small % of requests that intentionally reuse the same Idempotency-Key + same body to validate replay behavior (expect 200).
+- Include a small % that reuse same Idempotency-Key + different body to validate conflict handling (expect 409).
 
--   k6 script with smoke and load scenarios
--   Thresholds for latency and error rate
--   Replay and conflict simulation logic
--   Environment variable configuration
+### 2) Load Profile
+- Provide 2 scenarios:
+  a) Smoke test (short duration, low VUs)
+  b) Load test (stages ramp up/down)
+- Use thresholds:
+    - http_req_failed < 1%
+    - http_req_duration p(95) < 500ms (configurable via env var)
+    - checks pass rate > 99%
 
-### Validation Approach
+### 3) Reporting
+- Use checks for status codes and response schema basics.
+- Log minimal debug output only when an env var DEBUG=true.
 
--   Executed locally and in CI
--   Verified p95 latency and error thresholds
--   Confirmed idempotency behavior under load
+### 4) Output
+- One file: performance/k6/post-quotes.js
+- Include clear comments on how to run it.
+- All content in English.
+- Output ONLY the code block (no extra commentary).
 
-------------------------------------------------------------------------
+## Notes
+- If auth is not required, do not include Authorization headers.
+- Keep the script deterministic enough for CI usage.
 
-## Operational Runbook Prompt
+---
 
-### Purpose
+# Operational Runbook (README.md) Prompt
 
-Generate a production-grade operational README.md runbook for
-deployment, monitoring, scaling, and incident response.
+## Context
+Cloud-based REST API service exposing POST /api/v1/quotes.  
+Stack: Java 17, Spring Boot, SQL database.  
+Deployed in Docker/Kubernetes.  
+CI/CD via Azure DevOps.  
+Performance testing via k6.  
+Idempotency implemented via Idempotency-Key (UUID v4).
 
-### Output Summary
+## Objective
+Generate a production-grade operational Runbook as a README.md file.
 
--   Deployment and rollback procedures
--   Monitoring and alerting guidance
--   Idempotency operational notes
--   Disaster recovery and scaling strategy
+## Output Requirements
+- Output ONLY one file.
+- The filename must be: README.md
+- Output must be in a single fenced code block.
+- All content must be written in English.
+- Do not include explanations outside the file content.
 
-### Validation Approach
+## Mandatory Sections
+1) Service Overview
+2) Architecture Summary
+3) Deployment & Rollback
+4) Configuration & Environment Variables
+5) Monitoring & Alerts
+6) Idempotency Operational Guidelines
+7) Incident Response Playbooks
+8) Performance & Load Testing (k6)
+9) Scaling Strategy
+10) Disaster Recovery
+11) Security Considerations
 
--   Reviewed by engineering leadership
--   Cross-checked with Kubernetes manifests
--   Confirmed CI/CD alignment
+## Style
+Professional, operational, concise, actionable.
 
+## Tone
+Direct, no fluff.
+
+## Audience
+DevOps engineers, SREs, senior backend engineers.
